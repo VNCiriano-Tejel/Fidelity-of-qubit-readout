@@ -1,6 +1,6 @@
 import numpy as np
 
-def simulate_measurement_max(A, t_out, t_in, E_low, sigma_low , signal_high, sigma_high,  n_traces, t_max, acq_rate):
+def simulate_measurement(A, t_out, t_in, E_low, sigma_low , E_high, sigma_high,  n_traces=1, t_max=2000, acq_rate=1):
     """ Creates measurement traces using the input parameters and returns the maximum of each trace
       Parameters
       ----------
@@ -39,7 +39,19 @@ def simulate_measurement_max(A, t_out, t_in, E_low, sigma_low , signal_high, sig
             Acquisition rate in MHz
 
   """
-    
+  # Testing inputs
+  
+    if A < 0 or A> 1: raise ValueError(
+            "A must be between 0 and 1")
+    if type(n_traces) != int:
+        raise TypeError("The number of traces should be an *integer*.")
+    # and the right values (positive or null)
+    if t_out<0 or t_in<0:
+        raise ValueError("t_in and t_out should be positive numbers.")
+    if t_max*acq_rate< 3:
+        raise ValueError("The readout trace is too short. Try to increase the acquisition rate or the readout time (t_max).")
+    if t_max< 0 or acq_rate< 0: 
+        raise ValueError("The readout time and acquisition rate must be positive numbers.")
 
 
     ss = []
@@ -58,15 +70,15 @@ def simulate_measurement_max(A, t_out, t_in, E_low, sigma_low , signal_high, sig
             
         if choose_spin == 0 : #spin up
         # create a spin up trace i.e. trace with a blip of E_high 
-            line_spin_up =spin_up_trace_sim(t_out, t_in E_low, sigma_low, signal_high, sigma_high, t_max, acq_rate)       
+            line_spin_up =spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, acq_rate)       
             ss.append( line_spin_up )
             
     ss=np.array(ss)
     return(ss,spin_number)  # ss: array of 1D traces, spin_number: array with their corresponding spin
 
 
-def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, signal_high, sigma_high, t_max, acq_rate):
-        """ Creates a spin up measurement trace
+def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, acq_rate):
+    """ Creates a spin up measurement trace
       Parameters
       ----------
        
@@ -96,7 +108,7 @@ def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, signal_high, sigma_high, t_
             
           acq_rate:
             Acquisition rate in MHz   
-  """
+    """   
     sweep=np.arange(0,t_max, 1/acq_rate) # time sweep over trace
     ss_x=np.zeros(len(sweep)) # spin-up trace
     
@@ -107,13 +119,13 @@ def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, signal_high, sigma_high, t_
     i_enter = np.where(sweep<=t_enter+t_leave)[0][-1]
     
     
-    ss_x[0:i_leave] = signal_low + np.random.normal(0,sigma_low,len(sweep[0:i_leave])) # first part of trace (background)
+    ss_x[0:i_leave] = E_low + np.random.normal(0,sigma_low,len(sweep[0:i_leave])) # first part of trace (background)
 
     if i_enter == i_leave : #means blip time = 0
-        ss_x[i_leave:] =  signal_low + np.random.normal(0,sigma_low,len(sweep[i_leave:])) 
+        ss_x[i_leave:] =  E_low + np.random.normal(0,sigma_low,len(sweep[i_leave:])) 
 
     else : 
-        ss_x[i_leave:i_enter] = signal_high + np.random.normal(0,sigma_low,len(sweep[i_leave:i_enter])) # blip 
-        ss_x[i_enter:] = signal_low + np.random.normal(0,sigma_low,len(sweep[i_enter:])) # last part of the trace (background)
+        ss_x[i_leave:i_enter] = E_high + np.random.normal(0,sigma_low,len(sweep[i_leave:i_enter])) # blip 
+        ss_x[i_enter:] = E_low + np.random.normal(0,sigma_low,len(sweep[i_enter:])) # last part of the trace (background)
 
     return ss_x
