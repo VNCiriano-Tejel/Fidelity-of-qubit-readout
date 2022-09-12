@@ -54,7 +54,7 @@ def simulate_measurement(A, t_out, t_in, E_low, sigma_low , E_high, sigma_high, 
         raise ValueError("The readout time and acquisition rate must be positive numbers.")
 
 
-    ss = []
+    spin_traces = []
     spin_number=np.empty(0)
     n_points_time=int(t_max*acq_rate)
     
@@ -65,16 +65,16 @@ def simulate_measurement(A, t_out, t_in, E_low, sigma_low , E_high, sigma_high, 
         if choose_spin == 1 : # spin down because A = <P_down>
         # create a spin down trace i.e. constant E_low with noise sigma_low
             line_spin_down = E_low + np.random.normal(0,sigma_low ,n_points_time)
-            ss.append(line_spin_down )
+            spin_traces .append(line_spin_down )
             
             
         if choose_spin == 0 : #spin up
         # create a spin up trace i.e. trace with a blip of E_high 
             line_spin_up =spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, acq_rate)       
-            ss.append( line_spin_up )
+            spin_traces .append( line_spin_up )
             
-    ss=np.array(ss)
-    return(ss,spin_number)  # ss: array of 1D traces, spin_number: array with their corresponding spin
+    spin_traces =np.array(spin_traces )
+    return(spin_traces,spin_number)  # spin_traces : array of 1D traces, spin_number: array with their corresponding spin
 
 
 def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, acq_rate):
@@ -108,9 +108,10 @@ def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, 
             
           acq_rate:
             Acquisition rate in MHz   
+            
     """   
     sweep=np.arange(0,t_max, 1/acq_rate) # time sweep over trace
-    ss_x=np.zeros(len(sweep)) # spin-up trace
+    spin_trace_up=np.zeros(len(sweep)) # spin-up trace
     
     t_leave=np.random.exponential(t_out) #random t_out time
     t_enter=np.random.exponential(t_in) #random t_in time
@@ -119,13 +120,53 @@ def spin_up_trace_sim(t_out, t_in, E_low, sigma_low, E_high, sigma_high, t_max, 
     i_enter = np.where(sweep<=t_enter+t_leave)[0][-1]
     
     
-    ss_x[0:i_leave] = E_low + np.random.normal(0,sigma_low,len(sweep[0:i_leave])) # first part of trace (background)
+    spin_trace_up[0:i_leave] = E_low + np.random.normal(0,sigma_low,len(sweep[0:i_leave])) # first part of trace (background)
 
     if i_enter == i_leave : #means blip time = 0
-        ss_x[i_leave:] =  E_low + np.random.normal(0,sigma_low,len(sweep[i_leave:])) 
+        spin_trace_up[i_leave:] =  E_low + np.random.normal(0,sigma_low,len(sweep[i_leave:])) 
 
     else : 
-        ss_x[i_leave:i_enter] = E_high + np.random.normal(0,sigma_low,len(sweep[i_leave:i_enter])) # blip 
-        ss_x[i_enter:] = E_low + np.random.normal(0,sigma_low,len(sweep[i_enter:])) # last part of the trace (background)
+        spin_trace_up[i_leave:i_enter] = E_high + np.random.normal(0,sigma_low,len(sweep[i_leave:i_enter])) # blip 
+        spin_trace_up[i_enter:] = E_low + np.random.normal(0,sigma_low,len(sweep[i_enter:])) # last part of the trace (background)
 
-    return ss_x
+    return spin_trace_up
+
+def moving_avg_filter(spin_traces, factor, acq_rate):
+    """ Applies moving average filter to the generated traces
+        and reduces the measurement bandwidth
+      Parameters
+      ----------
+          spin_traces: 2D array
+            All data traces  
+              
+          factor: integer
+            length of the moving average. When n=20 a moving average is perform on array a every 20 points
+          acq_rate:
+             Acquisition rate in MHz   
+       
+       Returns
+       -------
+       2d array.
+        moving average of spin traces
+       
+  """
+  
+    
+    if type(factor) != int:
+        raise TypeError("Factor should be an *integer*.")
+    # and the right values (positive or null)
+    if factor<0:
+        raise ValueError("Factor needs to be a positive number.")
+
+
+  spin_traces_filtered=[]
+    for a in range(len(spin_traces)):
+        ret = np.cumsum(spin_traces, dtype=float)
+        ret[factor:] = ret[factor:] - ret[:-factor] 
+        spin_traces.append(ret[factor - 1:] / factor)
+        
+    return spin_traces_filtered
+ 
+  
+ 
+
